@@ -1,39 +1,36 @@
-import SignInCard from "@/components/SignInCard";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import Link from "next/link";
+import AppShell from "@/components/AppShell";
 
-export default async function HomePage() {
+export default async function AppPage() {
   const supabase = createSupabaseServerClient();
   const { data } = await supabase.auth.getUser();
 
-  if (data.user) {
-    return (
-      <main className="max-w-3xl mx-auto p-6">
-        <div className="rounded-2xl border border-zinc-800 p-6 bg-zinc-950">
-          <h1 className="text-2xl font-semibold">You are signed in</h1>
-          <p className="text-zinc-300 mt-2">Go to your vision board.</p>
-          <Link className="inline-block mt-4 rounded-xl bg-white text-black px-4 py-2" href="/app">
-            Open app
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  if (!data.user) redirect("/");
+
+  const userId = data.user.id;
+
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const { data: goals } = await supabase.from("goal_items").select("*").eq("user_id", userId);
+
+  const { data: history } = await supabase
+    .from("goal_item_history")
+    .select("*")
+    .eq("user_id", userId)
+    .order("changed_at", { ascending: false })
+    .limit(30);
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <div className="rounded-2xl border border-zinc-800 p-6 bg-zinc-950">
-        <h1 className="text-3xl font-semibold">Vision Board</h1>
-        <p className="text-zinc-300 mt-2">
-          Set 5 goals. Update them as life changes. Still win the year.
-        </p>
-      </div>
-
-      <div className="mt-6">
-        <SignInCard />
-      </div>
-
-      <div className="mt-10 text-sm text-zinc-500">Built with Supabase and Vercel.</div>
-    </main>
+    <AppShell
+      email={data.user.email ?? ""}
+      initialSettings={settings ?? null}
+      initialGoals={goals ?? []}
+      initialHistory={history ?? []}
+    />
   );
 }
